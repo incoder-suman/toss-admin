@@ -2,11 +2,11 @@
 import { Navigate } from "react-router-dom";
 
 export default function ProtectedRoute({ children }) {
-  // ✅ Token check karo (auth === true nahi, actual token)
-  const token = localStorage.getItem("token");
+  // ✅ Use the same key as used in Login.jsx
+  const token = localStorage.getItem("adminToken");
 
   if (!token) {
-    // Agar token nahi hai to redirect karega login page pe
+    // Agar token nahi hai to redirect kare login page pe
     return <Navigate to="/login" replace />;
   }
 
