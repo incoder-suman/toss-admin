@@ -1,11 +1,11 @@
+// src/pages/Users.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../api/axios"; // ✅ centralized axios instance
 
 export default function Users() {
   const [showCreate, setShowCreate] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,19 +14,19 @@ export default function Users() {
   const [tokenAmount, setTokenAmount] = useState("");
   const [history, setHistory] = useState([]);
 
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("adminToken"); // ✅ same key as login
 
-  // ✅ Fetch Users from Backend
+  // ✅ Fetch Users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const res = await axios.get("http://localhost:5000/api/users", {
+        const res = await api.get("/users", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUsers(res.data.users || []);
       } catch (err) {
-        console.error("Error fetching users:", err);
+        console.error("❌ Error fetching users:", err);
       } finally {
         setLoading(false);
       }
@@ -34,7 +34,7 @@ export default function Users() {
     fetchUsers();
   }, [token]);
 
-  // ✅ Generate Password
+  // ✅ Generate random password
   const generatePassword = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%";
     let pass = "";
@@ -42,10 +42,10 @@ export default function Users() {
     setCreateForm((p) => ({ ...p, password: pass }));
   };
 
-  // ✅ Create User
+  // ✅ Create new user
   const handleCreateUser = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/api/users", createForm, {
+      const res = await api.post("/users", createForm, {
         headers: { Authorization: `Bearer ${token}` },
       });
       alert("✅ User created successfully!");
@@ -61,13 +61,12 @@ export default function Users() {
   // ✅ Add Tokens
   const handleAddTokens = async () => {
     try {
-      const res = await axios.post(
-        "http://localhost:5000/api/users/add-tokens",
+      const res = await api.post(
+        "/users/add-tokens",
         { userId: selectedUser._id || selectedUser.id, amount: Number(tokenAmount) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       alert(`✅ ${tokenAmount} tokens added to ${selectedUser.name}`);
-      // Update wallet balance locally
       setUsers((prev) =>
         prev.map((u) =>
           u._id === selectedUser._id
@@ -83,10 +82,9 @@ export default function Users() {
     }
   };
 
-  // ✅ Fetch History (optional placeholder)
+  // ✅ Fetch History placeholder (when backend ready)
   const fetchHistory = async (user) => {
     try {
-      // TODO: integrate when transaction endpoint ready
       setHistory([
         { id: 1, type: "credit", amount: 50, date: "2025-09-25" },
         { id: 2, type: "credit", amount: 100, date: "2025-09-28" },
@@ -96,7 +94,6 @@ export default function Users() {
     }
   };
 
-  // 💡 Loading State
   if (loading) return <p className="p-6 text-gray-500">Loading users...</p>;
 
   return (
@@ -112,7 +109,7 @@ export default function Users() {
         </button>
       </div>
 
-      {/* Mobile Cards */}
+      {/* Mobile view */}
       <div className="grid gap-3 sm:hidden">
         {users.map((u) => (
           <div key={u._id || u.id} className="bg-white rounded-lg shadow p-3">
@@ -179,7 +176,7 @@ export default function Users() {
                 <td className="px-4 py-2">
                   {new Date(u.createdAt).toLocaleDateString()}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-center">
                   <div className="flex justify-center gap-2">
                     <button
                       onClick={() => {
@@ -230,15 +227,10 @@ export default function Users() {
                 <input
                   placeholder="Password"
                   value={createForm.password}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, password: e.target.value })
-                  }
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                   className="flex-1 border p-2 rounded"
                 />
-                <button
-                  onClick={generatePassword}
-                  className="px-3 py-2 bg-gray-200 rounded"
-                >
+                <button onClick={generatePassword} className="px-3 py-2 bg-gray-200 rounded">
                   Generate
                 </button>
               </div>
@@ -247,10 +239,7 @@ export default function Users() {
               <button onClick={() => setShowCreate(false)} className="px-4 py-2 border rounded">
                 Cancel
               </button>
-              <button
-                onClick={handleCreateUser}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
+              <button onClick={handleCreateUser} className="px-4 py-2 bg-blue-600 text-white rounded">
                 Save
               </button>
             </div>
@@ -274,10 +263,7 @@ export default function Users() {
               <button onClick={() => setShowTokens(false)} className="px-4 py-2 border rounded">
                 Cancel
               </button>
-              <button
-                onClick={handleAddTokens}
-                className="px-4 py-2 bg-green-600 text-white rounded"
-              >
+              <button onClick={handleAddTokens} className="px-4 py-2 bg-green-600 text-white rounded">
                 Add
               </button>
             </div>

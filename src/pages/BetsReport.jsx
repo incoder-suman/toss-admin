@@ -1,38 +1,63 @@
-import { useMemo, useState } from "react";
+// src/pages/BetsReport.jsx
+import { useEffect, useMemo, useState } from "react";
 import { Calendar, Download, Search } from "lucide-react";
-
-const sampleBets = [
-  { id: 1, userId: "U1001", match: "IND vs AUS Toss", side: "HEADS", stake: 200, win: 0, createdAt: "2025-09-25T12:00:00Z" },
-  { id: 2, userId: "U1002", match: "IND vs AUS Toss", side: "TAILS", stake: 500, win: 1000, createdAt: "2025-09-25T12:01:00Z" },
-  { id: 3, userId: "U1001", match: "ENG vs PAK Toss", side: "HEADS", stake: 300, win: 0, createdAt: "2025-09-24T16:00:00Z" },
-];
+import api from "../api/axios"; // ✅ central axios instance
 
 export default function BetsReport() {
   const [filters, setFilters] = useState({ from: "", to: "", userId: "" });
+  const [bets, setBets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const token = localStorage.getItem("adminToken"); // ✅ use admin token
 
+  // ✅ Fetch Bets from backend
+  useEffect(() => {
+    const fetchBets = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/bets", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setBets(res.data.bets || res.data || []); // backend structure safe parse
+      } catch (err) {
+        console.error("❌ Error fetching bets:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBets();
+  }, [token]);
+
+  // ✅ Apply Filters
   const rows = useMemo(() => {
-    return sampleBets.filter((b) => {
+    return bets.filter((b) => {
       const t = new Date(b.createdAt).getTime();
       const fromOk = filters.from ? t >= new Date(filters.from).getTime() : true;
       const toOk = filters.to ? t <= new Date(filters.to).getTime() : true;
       const userOk = filters.userId
-        ? b.userId.toLowerCase().includes(filters.userId.toLowerCase())
+        ? b.userId?.toString().toLowerCase().includes(filters.userId.toLowerCase())
         : true;
       return fromOk && toOk && userOk;
     });
-  }, [filters]);
+  }, [filters, bets]);
 
+  // ✅ Totals
   const totals = useMemo(() => {
-    const stake = rows.reduce((s, r) => s + r.stake, 0);
-    const win = rows.reduce((s, r) => s + r.win, 0);
+    const stake = rows.reduce((s, r) => s + (r.stake || 0), 0);
+    const win = rows.reduce((s, r) => s + (r.win || 0), 0);
     return { stake, win, net: win - stake };
   }, [rows]);
 
+  // ✅ Export CSV
   const exportCSV = () => {
     const header = ["Bet ID", "User ID", "Match", "Side", "Stake", "Win", "Time"];
     const lines = rows.map((r) => [
-      r.id, r.userId, r.match, r.side, r.stake, r.win,
-      new Date(r.createdAt).toLocaleString()
+      r._id || r.id,
+      r.userId?.email || r.userId || "—",
+      r.match?.title || r.match || "—",
+      r.side,
+      r.stake,
+      r.win,
+      new Date(r.createdAt).toLocaleString(),
     ]);
     const csv = [header, ...lines].map((arr) => arr.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -44,6 +69,8 @@ export default function BetsReport() {
     URL.revokeObjectURL(url);
   };
 
+  if (loading) return <p className="p-6 text-gray-500">Loading bets...</p>;
+
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-bold">Bets Report</h1>
@@ -52,7 +79,7 @@ export default function BetsReport() {
       <div className="bg-white rounded-2xl shadow p-5 grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="md:col-span-2">
           <label className="text-sm text-gray-600 flex items-center gap-2">
-            <Calendar size={16}/> From
+            <Calendar size={16} /> From
           </label>
           <input
             type="datetime-local"
@@ -63,7 +90,7 @@ export default function BetsReport() {
         </div>
         <div className="md:col-span-2">
           <label className="text-sm text-gray-600 flex items-center gap-2">
-            <Calendar size={16}/> To
+            <Calendar size={16} /> To
           </label>
           <input
             type="datetime-local"
@@ -74,7 +101,7 @@ export default function BetsReport() {
         </div>
         <div>
           <label className="text-sm text-gray-600 flex items-center gap-2">
-            <Search size={16}/> User ID
+            <Search size={16} /> User ID
           </label>
           <input
             type="text"
@@ -89,35 +116,9 @@ export default function BetsReport() {
             onClick={exportCSV}
             className="bg-cyan-600 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2"
           >
-            <Download size={18}/> Export CSV
+            <Download size={18} /> Export CSV
           </button>
         </div>
-      </div>
-
-      {/* Mobile Cards */}
-      <div className="grid gap-3 sm:hidden">
-        {rows.length === 0 ? (
-          <div className="text-gray-500 text-center">No bets found.</div>
-        ) : (
-          rows.map((r) => (
-            <div key={r.id} className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold">#{r.id} • {r.userId}</p>
-                <span className="text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</span>
-              </div>
-              <p className="text-sm mt-1">{r.match}</p>
-              <div className="flex items-center justify-between mt-2">
-                <span className="px-2 py-0.5 rounded bg-gray-100 text-xs">{r.side}</span>
-                <div className="text-right text-sm">
-                  <p>Stake: <b>₹{r.stake}</b></p>
-                  <p className={r.win > 0 ? "text-green-600 font-semibold" : ""}>
-                    Win: ₹{r.win}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
       </div>
 
       {/* Desktop Table */}
@@ -143,16 +144,20 @@ export default function BetsReport() {
               </tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="px-4 py-3">{r.id}</td>
-                  <td className="px-4 py-3 font-medium">{r.userId}</td>
-                  <td className="px-4 py-3">{r.match}</td>
+                <tr key={r._id || r.id} className="border-t">
+                  <td className="px-4 py-3">{r._id || r.id}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {r.userId?.email || r.userId || "—"}
+                  </td>
+                  <td className="px-4 py-3">{r.match?.title || r.match || "—"}</td>
                   <td className="px-4 py-3">{r.side}</td>
                   <td className="px-4 py-3">₹{r.stake}</td>
                   <td className={`px-4 py-3 ${r.win > 0 ? "text-green-600 font-semibold" : ""}`}>
                     ₹{r.win}
                   </td>
-                  <td className="px-4 py-3">{new Date(r.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    {new Date(r.createdAt).toLocaleString()}
+                  </td>
                 </tr>
               ))
             )}

@@ -1,6 +1,7 @@
+// src/pages/Matches.jsx
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import axios from "axios";
+import api from "../api/axios"; // ✅ central axios instance
 
 export default function Matches() {
   const [form, setForm] = useState({
@@ -13,26 +14,31 @@ export default function Matches() {
   });
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("adminToken"); // ✅ same key as login
 
-  // ✅ Fetch matches
+  // ✅ Fetch all matches
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/matches");
+        const res = await api.get("/matches", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setMatches(res.data.matches || res.data);
       } catch (err) {
-        console.error("Error fetching matches:", err);
+        console.error("❌ Error fetching matches:", err);
       }
     };
     fetchMatches();
-  }, []);
+  }, [token]);
 
-  // ✅ Create new match
+  // ✅ Create a new match
   const handleCreate = async (e) => {
     e.preventDefault();
     const { firstTeam, secondTeam, date, time } = form;
-    if (!firstTeam || !secondTeam || !date || !time) return;
+    if (!firstTeam || !secondTeam || !date || !time) {
+      alert("⚠️ Please fill all fields");
+      return;
+    }
 
     const startAt = new Date(`${date}T${time}:00`);
     const body = {
@@ -40,11 +46,13 @@ export default function Matches() {
       startAt,
       status: "UPCOMING",
       odds: { HEADS: 1.9, TAILS: 1.9 },
+      minBet: form.minBet,
+      maxBet: form.maxBet,
     };
 
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:5000/api/matches", body, {
+      const res = await api.post("/matches", body, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMatches((prev) => [res.data.match, ...prev]);
@@ -56,18 +64,20 @@ export default function Matches() {
         minBet: 10,
         maxBet: 1000,
       });
+      alert("✅ Match created successfully!");
     } catch (err) {
-      console.error("Error creating match:", err.response?.data || err.message);
+      console.error("❌ Error creating match:", err.response?.data || err.message);
+      alert(err.response?.data?.message || "Error creating match");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Update status (LIVE / COMPLETED)
+  // ✅ Update match status
   const updateStatus = async (id, status) => {
     try {
-      const res = await axios.put(
-        `http://localhost:5000/api/matches/${id}/status`,
+      const res = await api.put(
+        `/matches/${id}/status`,
         { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -75,11 +85,14 @@ export default function Matches() {
       setMatches((prev) =>
         prev.map((m) => (m._id === id ? { ...m, status: updated.status } : m))
       );
+      alert(`✅ Match status updated to ${status}`);
     } catch (err) {
-      console.error("Error updating status:", err.response?.data || err.message);
+      console.error("❌ Error updating status:", err.response?.data || err.message);
+      alert(err.response?.data?.message || "Error updating status");
     }
   };
 
+  // ✅ Status Badge Styling
   const statusBadge = (s) =>
     s === "UPCOMING"
       ? "bg-gray-100 text-gray-700"
@@ -134,6 +147,7 @@ export default function Matches() {
             onChange={(e) => setForm({ ...form, time: e.target.value })}
           />
         </div>
+
         <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
           <button
             type="submit"
