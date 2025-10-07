@@ -1,6 +1,7 @@
+// src/pages/Results.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Check, Swords } from "lucide-react";
-import axios from "axios";
+import api from "../api/axios"; // ✅ central axios instance
 
 export default function Results() {
   const [matches, setMatches] = useState([]);
@@ -8,12 +9,13 @@ export default function Results() {
   const [published, setPublished] = useState(
     JSON.parse(localStorage.getItem("publishedResults") || "[]")
   );
-  const token = localStorage.getItem("token");
+
+  const token = localStorage.getItem("adminToken"); // ✅ correct token key
 
   // ✅ Fetch matches from backend (LIVE or LOCKED)
   const fetchMatches = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/matches", {
+      const res = await api.get("/matches", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -22,12 +24,12 @@ export default function Results() {
       );
       setMatches(filtered);
 
-      // Auto select first if none selected
+      // Auto-select first if none selected
       if (filtered.length > 0 && !selection.matchId) {
         setSelection({ matchId: filtered[0]._id, outcome: "" });
       }
     } catch (err) {
-      console.error("Error fetching matches:", err);
+      console.error("❌ Error fetching matches:", err);
     }
   };
 
@@ -35,7 +37,7 @@ export default function Results() {
     fetchMatches();
   }, [token]);
 
-  // ✅ Keep localStorage in sync with published list
+  // ✅ Keep localStorage in sync
   useEffect(() => {
     localStorage.setItem("publishedResults", JSON.stringify(published));
   }, [published]);
@@ -46,15 +48,16 @@ export default function Results() {
     [matches, selection.matchId]
   );
 
-  // ✅ Publish result and trigger backend settlement
+  // ✅ Publish result to backend
   const publish = async () => {
     if (!selection.matchId || !selection.outcome)
-      return alert("Please select a match and outcome!");
+      return alert("⚠️ Please select a match and outcome!");
 
     try {
       console.log("Publishing result for:", selection.matchId);
-      const res = await axios.put(
-        `http://localhost:5000/api/matches/${selection.matchId}/result`,
+
+      const res = await api.put(
+        `/matches/${selection.matchId}/result`,
         { result: selection.outcome },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -67,14 +70,12 @@ export default function Results() {
         publishedAt: new Date().toISOString(),
       };
 
-      // ✅ Remove from live matches
+      // ✅ Remove match from list + save to local storage
       setMatches((prev) => prev.filter((m) => m._id !== selection.matchId));
-
-      // ✅ Save to state + persist to localStorage
       setPublished((prev) => [payload, ...prev]);
       setSelection({ matchId: "", outcome: "" });
 
-      alert(`✅ ${res.data.message}`);
+      alert(`✅ ${res.data.message || "Result published successfully!"}`);
     } catch (err) {
       console.error("❌ Error publishing result:", err);
       alert(err.response?.data?.message || "Error publishing result");
@@ -82,7 +83,7 @@ export default function Results() {
   };
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-bold">Results</h1>
 
       {/* Selection Box */}
@@ -137,7 +138,7 @@ export default function Results() {
         {/* Publish Button */}
         <div className="flex items-end">
           <button
-            className="bg-cyan-600 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2"
+            className="bg-cyan-600 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-60"
             onClick={publish}
             disabled={!selection.matchId || !selection.outcome}
           >
