@@ -45,7 +45,7 @@ export default function Matches() {
       title: `${firstTeam} vs ${secondTeam}`,
       startAt,
       status: "UPCOMING",
-      odds: { HEADS: 1.9, TAILS: 1.9 },
+      odds: { HEADS: 1.98, TAILS: 1.98 },
       minBet: form.minBet,
       maxBet: form.maxBet,
     };
