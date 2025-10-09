@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from "react";
-import api from "../api/axios";
+import api from "../api/axios"; // ✅ centralized axios instance
 
 export default function Users() {
   const [showCreate, setShowCreate] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false); // ✅ new
+  const [showWithdraw, setShowWithdraw] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [createForm, setCreateForm] = useState({ name: "", email: "", password: "" });
+  const [createForm, setCreateForm] = useState({ name: "", email: "", password: "Ftb@321" });
   const [selectedUser, setSelectedUser] = useState(null);
   const [tokenAmount, setTokenAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [history, setHistory] = useState([]);
 
   const token = localStorage.getItem("adminToken");
 
-  // ✅ Fetch all users
+  // ✅ Fetch Users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -34,32 +35,23 @@ export default function Users() {
     fetchUsers();
   }, [token]);
 
-  // ✅ Random password generator
-  const generatePassword = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%";
-    let pass = "";
-    for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-    setCreateForm((p) => ({ ...p, password: pass }));
-  };
-
-  // ✅ Create new user (email optional)
+  // ✅ Create new user (email optional, password fixed)
   const handleCreateUser = async () => {
     try {
-      if (!createForm.name || !createForm.password)
-        return alert("⚠️ Name and Password are required");
-
       const body = {
-        name: createForm.name,
-        email: createForm.email || `${Date.now()}@example.com`, // ✅ default if blank
-        password: createForm.password,
+        name: createForm.name.trim(),
+        email: createForm.email?.trim() || `${createForm.name.toLowerCase()}@dummy.com`,
+        password: "Ftb@321", // ✅ fixed password
       };
+      if (!body.name) return alert("⚠️ Name is required!");
 
       const res = await api.post("/users", body, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       alert("✅ User created successfully!");
       setUsers((prev) => [res.data.user, ...prev]);
-      setCreateForm({ name: "", email: "", password: "" });
+      setCreateForm({ name: "", email: "", password: "Ftb@321" });
       setShowCreate(false);
     } catch (err) {
       console.error(err);
@@ -72,10 +64,10 @@ export default function Users() {
     try {
       const res = await api.post(
         "/users/add-tokens",
-        { userId: selectedUser._id || selectedUser.id, amount: Number(tokenAmount) },
+        { userId: selectedUser._id, amount: Number(tokenAmount) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert(`✅ ₹${tokenAmount} tokens added to ${selectedUser.name}`);
+      alert(`✅ ${tokenAmount} tokens added to ${selectedUser.name}`);
       setUsers((prev) =>
         prev.map((u) =>
           u._id === selectedUser._id ? { ...u, walletBalance: res.data.newBalance } : u
@@ -89,34 +81,34 @@ export default function Users() {
     }
   };
 
-  // ✅ Withdraw Tokens (deduct from wallet)
+  // ✅ Withdraw Tokens (minus from wallet)
   const handleWithdrawTokens = async () => {
     try {
       const res = await api.post(
         "/users/withdraw-tokens",
-        { userId: selectedUser._id || selectedUser.id, amount: Number(tokenAmount) },
+        { userId: selectedUser._id, amount: Number(withdrawAmount) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert(`✅ ₹${tokenAmount} withdrawn from ${selectedUser.name}`);
+      alert(`💸 ${withdrawAmount} tokens withdrawn from ${selectedUser.name}`);
       setUsers((prev) =>
         prev.map((u) =>
           u._id === selectedUser._id ? { ...u, walletBalance: res.data.newBalance } : u
         )
       );
       setShowWithdraw(false);
-      setTokenAmount("");
+      setWithdrawAmount("");
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.message || "Error withdrawing tokens");
     }
   };
 
-  // ✅ Dummy Transaction History (for future)
+  // ✅ Fetch dummy transaction history
   const fetchHistory = async (user) => {
     try {
       setHistory([
         { id: 1, type: "credit", amount: 50, date: "2025-09-25" },
-        { id: 2, type: "debit", amount: 30, date: "2025-09-28" },
+        { id: 2, type: "withdraw", amount: 30, date: "2025-09-27" },
       ]);
     } catch (err) {
       console.error(err);
@@ -127,6 +119,7 @@ export default function Users() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Users</h1>
         <button
@@ -137,7 +130,7 @@ export default function Users() {
         </button>
       </div>
 
-      {/* Desktop Table */}
+      {/* Table */}
       <div className="bg-white shadow rounded overflow-x-auto">
         <table className="min-w-[720px] w-full text-sm">
           <thead className="bg-gray-50 text-gray-700">
@@ -151,12 +144,10 @@ export default function Users() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u._id || u.id} className="border-t">
+              <tr key={u._id} className="border-t">
                 <td className="px-4 py-2 font-medium">{u.name}</td>
                 <td className="px-4 py-2">{u.email}</td>
-                <td className="px-4 py-2 text-right">
-                  ₹{u.walletBalance ?? u.balance ?? 0}
-                </td>
+                <td className="px-4 py-2 text-right">₹{u.walletBalance ?? 0}</td>
                 <td className="px-4 py-2">
                   {new Date(u.createdAt).toLocaleDateString()}
                 </td>
@@ -167,7 +158,7 @@ export default function Users() {
                         setSelectedUser(u);
                         setShowTokens(true);
                       }}
-                      className="px-3 py-1 border rounded text-xs hover:bg-green-50"
+                      className="px-3 py-1 border rounded text-xs hover:bg-gray-50"
                     >
                       Add
                     </button>
@@ -176,7 +167,7 @@ export default function Users() {
                         setSelectedUser(u);
                         setShowWithdraw(true);
                       }}
-                      className="px-3 py-1 border rounded text-xs hover:bg-red-50"
+                      className="px-3 py-1 border rounded text-xs hover:bg-gray-50"
                     >
                       Withdraw
                     </button>
@@ -200,113 +191,122 @@ export default function Users() {
 
       {/* ✅ Create User Modal */}
       {showCreate && (
-        <Modal title="Create User" onClose={() => setShowCreate(false)}>
-          <div className="space-y-2">
-            <input
-              placeholder="Name"
-              value={createForm.name}
-              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-              className="w-full border p-2 rounded"
-            />
-            <input
-              placeholder="Email (optional)"
-              value={createForm.email}
-              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-              className="w-full border p-2 rounded"
-            />
-            <div className="flex gap-2">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-5 rounded-lg w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Create User</h2>
+            <div className="space-y-2">
               <input
-                placeholder="Password"
-                value={createForm.password}
-                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                className="flex-1 border p-2 rounded"
+                placeholder="Name"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                className="w-full border p-2 rounded"
               />
-              <button onClick={generatePassword} className="px-3 py-2 bg-gray-200 rounded">
-                Generate
+              <input
+                placeholder="Email (optional)"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="text"
+                disabled
+                value="Ftb@321"
+                className="w-full border p-2 rounded bg-gray-100"
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setShowCreate(false)} className="px-4 py-2 border rounded">
+                Cancel
+              </button>
+              <button onClick={handleCreateUser} className="px-4 py-2 bg-blue-600 text-white rounded">
+                Save
               </button>
             </div>
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <button onClick={() => setShowCreate(false)} className="px-4 py-2 border rounded">
-              Cancel
-            </button>
-            <button onClick={handleCreateUser} className="px-4 py-2 bg-blue-600 text-white rounded">
-              Save
-            </button>
-          </div>
-        </Modal>
+        </div>
       )}
 
       {/* ✅ Add Tokens Modal */}
       {showTokens && selectedUser && (
-        <TokenModal
-          title={`Add Tokens – ${selectedUser.name}`}
-          onClose={() => setShowTokens(false)}
-          onSubmit={handleAddTokens}
-          amount={tokenAmount}
-          setAmount={setTokenAmount}
-          color="green"
-          action="Add"
-        />
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-5 rounded-lg w-full max-w-sm">
+            <h2 className="text-lg font-semibold mb-4">Add Tokens – {selectedUser.name}</h2>
+            <input
+              type="number"
+              placeholder="Amount"
+              value={tokenAmount}
+              onChange={(e) => setTokenAmount(e.target.value)}
+              className="w-full border p-2 rounded mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowTokens(false)} className="px-4 py-2 border rounded">
+                Cancel
+              </button>
+              <button onClick={handleAddTokens} className="px-4 py-2 bg-green-600 text-white rounded">
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ✅ Withdraw Tokens Modal */}
       {showWithdraw && selectedUser && (
-        <TokenModal
-          title={`Withdraw Tokens – ${selectedUser.name}`}
-          onClose={() => setShowWithdraw(false)}
-          onSubmit={handleWithdrawTokens}
-          amount={tokenAmount}
-          setAmount={setTokenAmount}
-          color="red"
-          action="Withdraw"
-        />
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-5 rounded-lg w-full max-w-sm">
+            <h2 className="text-lg font-semibold mb-4">Withdraw Tokens – {selectedUser.name}</h2>
+            <input
+              type="number"
+              placeholder="Amount"
+              value={withdrawAmount}
+              onChange={(e) => setWithdrawAmount(e.target.value)}
+              className="w-full border p-2 rounded mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowWithdraw(false)} className="px-4 py-2 border rounded">
+                Cancel
+              </button>
+              <button onClick={handleWithdrawTokens} className="px-4 py-2 bg-red-600 text-white rounded">
+                Withdraw
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
-  );
-}
 
-/* ✅ Reusable Components */
-function Modal({ title, children, onClose }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white p-5 rounded-lg w-full max-w-md">
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
-        {children}
-        <div className="flex justify-end mt-4">
-          <button onClick={onClose} className="px-4 py-2 border rounded">
-            Close
-          </button>
+      {/* ✅ History Modal */}
+      {showHistory && selectedUser && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-5 rounded-lg w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold mb-4">
+              Transaction History – {selectedUser.name}
+            </h2>
+            <table className="min-w-[420px] w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left">Type</th>
+                  <th className="px-3 py-2 text-right">Amount</th>
+                  <th className="px-3 py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} className="border-t">
+                    <td className="px-3 py-2 capitalize">{h.type}</td>
+                    <td className="px-3 py-2 text-right">₹{h.amount}</td>
+                    <td className="px-3 py-2">{h.date}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowHistory(false)} className="px-4 py-2 border rounded">
+                Close
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function TokenModal({ title, onClose, onSubmit, amount, setAmount, color, action }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white p-5 rounded-lg w-full max-w-sm">
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
-        <input
-          type="number"
-          placeholder="Amount"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="w-full border p-2 rounded mb-4"
-        />
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 border rounded">
-            Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            className={`px-4 py-2 bg-${color}-600 text-white rounded hover:bg-${color}-700`}
-          >
-            {action}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
