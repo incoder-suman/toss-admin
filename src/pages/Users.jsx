@@ -41,7 +41,7 @@ export default function Users() {
       const body = {
         name: createForm.name.trim(),
         email: createForm.email?.trim() || `${createForm.name.toLowerCase()}@dummy.com`,
-        password: "Ftb@321", // ✅ fixed password
+        password: "Ftb@321",
       };
       if (!body.name) return alert("⚠️ Name is required!");
 
@@ -61,6 +61,10 @@ export default function Users() {
 
   // ✅ Add Tokens
   const handleAddTokens = async () => {
+    if (!selectedUser?._id) return alert("⚠️ No user selected");
+    if (!tokenAmount || isNaN(tokenAmount) || Number(tokenAmount) <= 0)
+      return alert("⚠️ Enter valid amount");
+
     try {
       const res = await api.post(
         "/users/add-tokens",
@@ -81,8 +85,12 @@ export default function Users() {
     }
   };
 
-  // ✅ Withdraw Tokens (minus from wallet)
+  // ✅ Withdraw Tokens
   const handleWithdrawTokens = async () => {
+    if (!selectedUser?._id) return alert("⚠️ No user selected");
+    if (!withdrawAmount || isNaN(withdrawAmount) || Number(withdrawAmount) <= 0)
+      return alert("⚠️ Enter valid amount");
+
     try {
       const res = await api.post(
         "/users/withdraw-tokens",
@@ -103,15 +111,16 @@ export default function Users() {
     }
   };
 
-  // ✅ Fetch dummy transaction history
+  // ✅ Fetch real transaction history from backend
   const fetchHistory = async (user) => {
     try {
-      setHistory([
-        { id: 1, type: "credit", amount: 50, date: "2025-09-25" },
-        { id: 2, type: "withdraw", amount: 30, date: "2025-09-27" },
-      ]);
+      const res = await api.get(`/users/transactions/${user._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHistory(res.data.transactions || []);
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error fetching history:", err);
+      alert("Failed to fetch transaction history");
     }
   };
 
@@ -291,10 +300,12 @@ export default function Users() {
               </thead>
               <tbody>
                 {history.map((h) => (
-                  <tr key={h.id} className="border-t">
+                  <tr key={h._id} className="border-t">
                     <td className="px-3 py-2 capitalize">{h.type}</td>
                     <td className="px-3 py-2 text-right">₹{h.amount}</td>
-                    <td className="px-3 py-2">{h.date}</td>
+                    <td className="px-3 py-2">
+                      {new Date(h.createdAt).toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
