@@ -1,7 +1,6 @@
-// src/pages/Results.jsx
 import { useEffect, useMemo, useState } from "react";
-import { Check, Swords } from "lucide-react";
-import api from "../api/axios"; // ✅ central axios instance
+import { Check, Swords, MinusCircle } from "lucide-react";
+import api from "../api/axios";
 
 export default function Results() {
   const [matches, setMatches] = useState([]);
@@ -10,9 +9,9 @@ export default function Results() {
     JSON.parse(localStorage.getItem("publishedResults") || "[]")
   );
 
-  const token = localStorage.getItem("adminToken"); // ✅ correct token key
+  const token = localStorage.getItem("adminToken");
 
-  // ✅ Fetch matches from backend (LIVE or LOCKED)
+  // ✅ Fetch LIVE/LOCKED matches
   const fetchMatches = async () => {
     try {
       const res = await api.get("/matches", {
@@ -24,7 +23,7 @@ export default function Results() {
       );
       setMatches(filtered);
 
-      // Auto-select first if none selected
+      // Auto-select first
       if (filtered.length > 0 && !selection.matchId) {
         setSelection({ matchId: filtered[0]._id, outcome: "" });
       }
@@ -37,24 +36,23 @@ export default function Results() {
     fetchMatches();
   }, [token]);
 
-  // ✅ Keep localStorage in sync
+  // ✅ Sync published results to localStorage
   useEffect(() => {
     localStorage.setItem("publishedResults", JSON.stringify(published));
   }, [published]);
 
-  // ✅ Get selected match
   const selectedMatch = useMemo(
     () => matches.find((m) => m._id === selection.matchId),
     [matches, selection.matchId]
   );
 
-  // ✅ Publish result to backend
+  // ✅ Publish match result
   const publish = async () => {
     if (!selection.matchId || !selection.outcome)
       return alert("⚠️ Please select a match and outcome!");
 
     try {
-      console.log("Publishing result for:", selection.matchId);
+      console.log("Publishing result for:", selection.matchId, selection.outcome);
 
       const res = await api.put(
         `/matches/${selection.matchId}/result`,
@@ -70,7 +68,6 @@ export default function Results() {
         publishedAt: new Date().toISOString(),
       };
 
-      // ✅ Remove match from list + save to local storage
       setMatches((prev) => prev.filter((m) => m._id !== selection.matchId));
       setPublished((prev) => [payload, ...prev]);
       setSelection({ matchId: "", outcome: "" });
@@ -116,22 +113,38 @@ export default function Results() {
           <div className="mt-2 flex gap-3 flex-wrap">
             {selectedMatch &&
               selectedMatch.title
-                ?.split(" vs ")
-                .map((team) => (
-                  <button
-                    key={team}
-                    onClick={() =>
-                      setSelection({ ...selection, outcome: team.trim() })
-                    }
-                    className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
-                      selection.outcome === team.trim()
-                        ? "border-cyan-600 bg-cyan-50 text-cyan-700"
-                        : "border-gray-200 hover:bg-gray-50"
-                    }`}
-                  >
-                    <Swords size={16} /> {team}
-                  </button>
-                ))}
+                ?.split(/vs/i)
+                .map((team) => {
+                  const full = team.trim();
+                  const short = full.slice(0, 3).toUpperCase();
+                  return (
+                    <button
+                      key={full}
+                      onClick={() =>
+                        setSelection({ ...selection, outcome: full })
+                      }
+                      className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
+                        selection.outcome === full
+                          ? "border-cyan-600 bg-cyan-50 text-cyan-700"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <Swords size={16} /> {full} ({short})
+                    </button>
+                  );
+                })}
+
+            {/* ➕ Draw option */}
+            <button
+              onClick={() => setSelection({ ...selection, outcome: "DRAW" })}
+              className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
+                selection.outcome === "DRAW"
+                  ? "border-red-600 bg-red-50 text-red-700"
+                  : "border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <MinusCircle size={16} /> Match Draw
+            </button>
           </div>
         </div>
 
@@ -160,7 +173,13 @@ export default function Results() {
                   {new Date(r.publishedAt).toLocaleString()}
                 </p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 font-semibold">
+              <span
+                className={`px-3 py-1 rounded-full font-semibold ${
+                  r.outcome === "DRAW"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-cyan-100 text-cyan-700"
+                }`}
+              >
                 {r.outcome}
               </span>
             </div>
