@@ -1,10 +1,10 @@
-// src/pages/Users.jsx
 import React, { useState, useEffect } from "react";
-import api from "../api/axios"; // ✅ centralized axios instance
+import api from "../api/axios";
 
 export default function Users() {
   const [showCreate, setShowCreate] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false); // ✅ new
   const [showHistory, setShowHistory] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,9 +14,9 @@ export default function Users() {
   const [tokenAmount, setTokenAmount] = useState("");
   const [history, setHistory] = useState([]);
 
-  const token = localStorage.getItem("adminToken"); // ✅ same key as login
+  const token = localStorage.getItem("adminToken");
 
-  // ✅ Fetch Users
+  // ✅ Fetch all users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -34,7 +34,7 @@ export default function Users() {
     fetchUsers();
   }, [token]);
 
-  // ✅ Generate random password
+  // ✅ Random password generator
   const generatePassword = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%";
     let pass = "";
@@ -42,10 +42,19 @@ export default function Users() {
     setCreateForm((p) => ({ ...p, password: pass }));
   };
 
-  // ✅ Create new user
+  // ✅ Create new user (email optional)
   const handleCreateUser = async () => {
     try {
-      const res = await api.post("/users", createForm, {
+      if (!createForm.name || !createForm.password)
+        return alert("⚠️ Name and Password are required");
+
+      const body = {
+        name: createForm.name,
+        email: createForm.email || `${Date.now()}@example.com`, // ✅ default if blank
+        password: createForm.password,
+      };
+
+      const res = await api.post("/users", body, {
         headers: { Authorization: `Bearer ${token}` },
       });
       alert("✅ User created successfully!");
@@ -66,12 +75,10 @@ export default function Users() {
         { userId: selectedUser._id || selectedUser.id, amount: Number(tokenAmount) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert(`✅ ${tokenAmount} tokens added to ${selectedUser.name}`);
+      alert(`✅ ₹${tokenAmount} tokens added to ${selectedUser.name}`);
       setUsers((prev) =>
         prev.map((u) =>
-          u._id === selectedUser._id
-            ? { ...u, walletBalance: res.data.newBalance }
-            : u
+          u._id === selectedUser._id ? { ...u, walletBalance: res.data.newBalance } : u
         )
       );
       setShowTokens(false);
@@ -82,12 +89,34 @@ export default function Users() {
     }
   };
 
-  // ✅ Fetch History placeholder (when backend ready)
+  // ✅ Withdraw Tokens (deduct from wallet)
+  const handleWithdrawTokens = async () => {
+    try {
+      const res = await api.post(
+        "/users/withdraw-tokens",
+        { userId: selectedUser._id || selectedUser.id, amount: Number(tokenAmount) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert(`✅ ₹${tokenAmount} withdrawn from ${selectedUser.name}`);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u._id === selectedUser._id ? { ...u, walletBalance: res.data.newBalance } : u
+        )
+      );
+      setShowWithdraw(false);
+      setTokenAmount("");
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Error withdrawing tokens");
+    }
+  };
+
+  // ✅ Dummy Transaction History (for future)
   const fetchHistory = async (user) => {
     try {
       setHistory([
         { id: 1, type: "credit", amount: 50, date: "2025-09-25" },
-        { id: 2, type: "credit", amount: 100, date: "2025-09-28" },
+        { id: 2, type: "debit", amount: 30, date: "2025-09-28" },
       ]);
     } catch (err) {
       console.error(err);
@@ -98,7 +127,6 @@ export default function Users() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Users</h1>
         <button
@@ -109,52 +137,8 @@ export default function Users() {
         </button>
       </div>
 
-      {/* Mobile view */}
-      <div className="grid gap-3 sm:hidden">
-        {users.map((u) => (
-          <div key={u._id || u.id} className="bg-white rounded-lg shadow p-3">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold">{u.name}</p>
-              <span className="text-xs text-gray-500">
-                {new Date(u.createdAt).toLocaleDateString()}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mt-1">{u.email}</p>
-            <div className="flex items-center justify-between mt-3">
-              <p className="text-sm">
-                Balance:{" "}
-                <span className="font-semibold">
-                  ₹{u.walletBalance ?? u.balance ?? 0}
-                </span>
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setSelectedUser(u);
-                    setShowTokens(true);
-                  }}
-                  className="px-3 py-1 border rounded text-xs"
-                >
-                  Add Tokens
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedUser(u);
-                    fetchHistory(u);
-                    setShowHistory(true);
-                  }}
-                  className="px-3 py-1 border rounded text-xs"
-                >
-                  History
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Desktop Table */}
-      <div className="hidden sm:block bg-white shadow rounded overflow-x-auto">
+      <div className="bg-white shadow rounded overflow-x-auto">
         <table className="min-w-[720px] w-full text-sm">
           <thead className="bg-gray-50 text-gray-700">
             <tr>
@@ -183,9 +167,18 @@ export default function Users() {
                         setSelectedUser(u);
                         setShowTokens(true);
                       }}
-                      className="px-3 py-1 border rounded text-xs hover:bg-gray-50"
+                      className="px-3 py-1 border rounded text-xs hover:bg-green-50"
                     >
-                      Add Tokens
+                      Add
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedUser(u);
+                        setShowWithdraw(true);
+                      }}
+                      className="px-3 py-1 border rounded text-xs hover:bg-red-50"
+                    >
+                      Withdraw
                     </button>
                     <button
                       onClick={() => {
@@ -207,105 +200,113 @@ export default function Users() {
 
       {/* ✅ Create User Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-5 rounded-lg w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Create User</h2>
-            <div className="space-y-2">
+        <Modal title="Create User" onClose={() => setShowCreate(false)}>
+          <div className="space-y-2">
+            <input
+              placeholder="Name"
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              className="w-full border p-2 rounded"
+            />
+            <input
+              placeholder="Email (optional)"
+              value={createForm.email}
+              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              className="w-full border p-2 rounded"
+            />
+            <div className="flex gap-2">
               <input
-                placeholder="Name"
-                value={createForm.name}
-                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                className="w-full border p-2 rounded"
+                placeholder="Password"
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                className="flex-1 border p-2 rounded"
               />
-              <input
-                placeholder="Email"
-                value={createForm.email}
-                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                className="w-full border p-2 rounded"
-              />
-              <div className="flex gap-2">
-                <input
-                  placeholder="Password"
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  className="flex-1 border p-2 rounded"
-                />
-                <button onClick={generatePassword} className="px-3 py-2 bg-gray-200 rounded">
-                  Generate
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 border rounded">
-                Cancel
-              </button>
-              <button onClick={handleCreateUser} className="px-4 py-2 bg-blue-600 text-white rounded">
-                Save
+              <button onClick={generatePassword} className="px-3 py-2 bg-gray-200 rounded">
+                Generate
               </button>
             </div>
           </div>
-        </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 border rounded">
+              Cancel
+            </button>
+            <button onClick={handleCreateUser} className="px-4 py-2 bg-blue-600 text-white rounded">
+              Save
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* ✅ Add Tokens Modal */}
       {showTokens && selectedUser && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-5 rounded-lg w-full max-w-sm">
-            <h2 className="text-lg font-semibold mb-4">Add Tokens – {selectedUser.name}</h2>
-            <input
-              type="number"
-              placeholder="Amount"
-              value={tokenAmount}
-              onChange={(e) => setTokenAmount(e.target.value)}
-              className="w-full border p-2 rounded mb-4"
-            />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowTokens(false)} className="px-4 py-2 border rounded">
-                Cancel
-              </button>
-              <button onClick={handleAddTokens} className="px-4 py-2 bg-green-600 text-white rounded">
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
+        <TokenModal
+          title={`Add Tokens – ${selectedUser.name}`}
+          onClose={() => setShowTokens(false)}
+          onSubmit={handleAddTokens}
+          amount={tokenAmount}
+          setAmount={setTokenAmount}
+          color="green"
+          action="Add"
+        />
       )}
 
-      {/* ✅ History Modal */}
-      {showHistory && selectedUser && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-5 rounded-lg w-full max-w-lg max-h-[80vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">
-              Transaction History – {selectedUser.name}
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-[420px] w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Type</th>
-                    <th className="px-3 py-2 text-right">Amount</th>
-                    <th className="px-3 py-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h) => (
-                    <tr key={h.id} className="border-t">
-                      <td className="px-3 py-2">{h.type}</td>
-                      <td className="px-3 py-2 text-right">₹{h.amount}</td>
-                      <td className="px-3 py-2">{h.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex justify-end mt-4">
-              <button onClick={() => setShowHistory(false)} className="px-4 py-2 border rounded">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ✅ Withdraw Tokens Modal */}
+      {showWithdraw && selectedUser && (
+        <TokenModal
+          title={`Withdraw Tokens – ${selectedUser.name}`}
+          onClose={() => setShowWithdraw(false)}
+          onSubmit={handleWithdrawTokens}
+          amount={tokenAmount}
+          setAmount={setTokenAmount}
+          color="red"
+          action="Withdraw"
+        />
       )}
+    </div>
+  );
+}
+
+/* ✅ Reusable Components */
+function Modal({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-5 rounded-lg w-full max-w-md">
+        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+        {children}
+        <div className="flex justify-end mt-4">
+          <button onClick={onClose} className="px-4 py-2 border rounded">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TokenModal({ title, onClose, onSubmit, amount, setAmount, color, action }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-5 rounded-lg w-full max-w-sm">
+        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+        <input
+          type="number"
+          placeholder="Amount"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full border p-2 rounded mb-4"
+        />
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 border rounded">
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            className={`px-4 py-2 bg-${color}-600 text-white rounded hover:bg-${color}-700`}
+          >
+            {action}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
