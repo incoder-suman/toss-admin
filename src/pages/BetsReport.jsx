@@ -1,178 +1,173 @@
-// src/pages/BetsReport.jsx
-import { useEffect, useMemo, useState } from "react";
-import { Calendar, Download, Search } from "lucide-react";
-import api from "../api/axios"; // ✅ central axios instance
+import { useEffect, useState, useMemo } from "react";
+import { Search } from "lucide-react";
+import api from "../api/axios"; // central axios instance
 
 export default function BetsReport() {
-  const [filters, setFilters] = useState({ from: "", to: "", userId: "" });
+  const [userId, setUserId] = useState("");
   const [bets, setBets] = useState([]);
   const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem("adminToken"); // ✅ use admin token
+  const token = localStorage.getItem("adminToken");
 
-  // ✅ Fetch Bets from backend
+  // 🔁 Fetch bets for entered User ID
   useEffect(() => {
-    const fetchBets = async () => {
+    if (!userId.trim()) {
+      setBets([]);
+      return;
+    }
+
+    const fetchUserBets = async () => {
       try {
         setLoading(true);
-        const res = await api.get("/bets", {
+        const res = await api.get(`/bets?userId=${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setBets(res.data.bets || res.data || []); // backend structure safe parse
+        setBets(res.data.bets || res.data || []);
       } catch (err) {
         console.error("❌ Error fetching bets:", err);
+        setBets([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchBets();
-  }, [token]);
 
-  // ✅ Apply Filters
-  const rows = useMemo(() => {
-    return bets.filter((b) => {
-      const t = new Date(b.createdAt).getTime();
-      const fromOk = filters.from ? t >= new Date(filters.from).getTime() : true;
-      const toOk = filters.to ? t <= new Date(filters.to).getTime() : true;
-      const userOk = filters.userId
-        ? b.userId?.toString().toLowerCase().includes(filters.userId.toLowerCase())
-        : true;
-      return fromOk && toOk && userOk;
-    });
-  }, [filters, bets]);
+    // debounce (wait 600 ms after typing)
+    const timer = setTimeout(fetchUserBets, 600);
+    return () => clearTimeout(timer);
+  }, [userId, token]);
 
-  // ✅ Totals
+  // 💰 Totals
   const totals = useMemo(() => {
-    const stake = rows.reduce((s, r) => s + (r.stake || 0), 0);
-    const win = rows.reduce((s, r) => s + (r.win || 0), 0);
+    const stake = bets.reduce((s, r) => s + (r.stake || 0), 0);
+    const win = bets.reduce((s, r) => s + (r.win || 0), 0);
     return { stake, win, net: win - stake };
-  }, [rows]);
-
-  // ✅ Export CSV
-  const exportCSV = () => {
-    const header = ["Bet ID", "User ID", "Match", "Side", "Stake", "Win", "Time"];
-    const lines = rows.map((r) => [
-      r._id || r.id,
-      r.userId?.email || r.userId || "—",
-      r.match?.title || r.match || "—",
-      r.side,
-      r.stake,
-      r.win,
-      new Date(r.createdAt).toLocaleString(),
-    ]);
-    const csv = [header, ...lines].map((arr) => arr.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `bets-report-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (loading) return <p className="p-6 text-gray-500">Loading bets...</p>;
+  }, [bets]);
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-bold">Bets Report</h1>
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl shadow p-5 grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="md:col-span-2">
+      {/* 🔍 Search box */}
+      <div className="bg-white rounded-2xl shadow p-4 flex gap-3 items-end flex-col sm:flex-row">
+        <div className="flex-1 w-full">
           <label className="text-sm text-gray-600 flex items-center gap-2">
-            <Calendar size={16} /> From
-          </label>
-          <input
-            type="datetime-local"
-            className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
-            value={filters.from}
-            onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="text-sm text-gray-600 flex items-center gap-2">
-            <Calendar size={16} /> To
-          </label>
-          <input
-            type="datetime-local"
-            className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
-            value={filters.to}
-            onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-          />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600 flex items-center gap-2">
-            <Search size={16} /> User ID
+            <Search size={16} /> Enter User ID or Email
           </label>
           <input
             type="text"
-            placeholder="e.g. U1001"
+            placeholder="e.g. U1001 or user email"
             className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
-            value={filters.userId}
-            onChange={(e) => setFilters({ ...filters, userId: e.target.value })}
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
           />
         </div>
-        <div className="md:col-span-5 flex justify-end">
-          <button
-            onClick={exportCSV}
-            className="bg-cyan-600 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2"
-          >
-            <Download size={18} /> Export CSV
-          </button>
-        </div>
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden sm:block bg-white rounded-2xl shadow overflow-x-auto">
-        <table className="min-w-[900px] w-full text-sm">
-          <thead className="bg-gray-50 text-gray-600">
-            <tr>
-              <th className="px-4 py-3 text-left">Bet ID</th>
-              <th className="px-4 py-3 text-left">User</th>
-              <th className="px-4 py-3 text-left">Match</th>
-              <th className="px-4 py-3 text-left">Side</th>
-              <th className="px-4 py-3 text-left">Stake</th>
-              <th className="px-4 py-3 text-left">Win</th>
-              <th className="px-4 py-3 text-left">Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
+      {/* 🕓 Loading */}
+      {loading && <p className="text-gray-500 p-4">Loading user bets...</p>}
+
+      {/* 🧾 Bets table (desktop) */}
+      {!loading && (
+        <div className="bg-white rounded-2xl shadow overflow-x-auto hidden sm:block">
+          <table className="min-w-[900px] w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
-                  No bets found.
-                </td>
+                <th className="px-4 py-3 text-left">Bet ID</th>
+                <th className="px-4 py-3 text-left">User</th>
+                <th className="px-4 py-3 text-left">Match</th>
+                <th className="px-4 py-3 text-left">Team</th>
+                <th className="px-4 py-3 text-left">Stake</th>
+                <th className="px-4 py-3 text-left">Win</th>
+                <th className="px-4 py-3 text-left">Time</th>
               </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r._id || r.id} className="border-t">
-                  <td className="px-4 py-3">{r._id || r.id}</td>
-                  <td className="px-4 py-3 font-medium">
-                    {r.userId?.email || r.userId || "—"}
-                  </td>
-                  <td className="px-4 py-3">{r.match?.title || r.match || "—"}</td>
-                  <td className="px-4 py-3">{r.side}</td>
-                  <td className="px-4 py-3">₹{r.stake}</td>
-                  <td className={`px-4 py-3 ${r.win > 0 ? "text-green-600 font-semibold" : ""}`}>
-                    ₹{r.win}
-                  </td>
-                  <td className="px-4 py-3">
-                    {new Date(r.createdAt).toLocaleString()}
+            </thead>
+            <tbody>
+              {bets.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                    No bets found for this user.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                bets.map((r) => (
+                  <tr key={r._id || r.id} className="border-t">
+                    <td className="px-4 py-3">{r._id || r.id}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {r.userId?.email || r.userId || "—"}
+                    </td>
+                    <td className="px-4 py-3">{r.match?.title || r.match || "—"}</td>
+                    <td className="px-4 py-3">{r.team || r.selectedTeam || "—"}</td>
+                    <td className="px-4 py-3">₹{r.stake}</td>
+                    <td
+                      className={`px-4 py-3 ${
+                        r.win > 0 ? "text-green-600 font-semibold" : ""
+                      }`}
+                    >
+                      ₹{r.win}
+                    </td>
+                    <td className="px-4 py-3">
+                      {new Date(r.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {/* Totals */}
-      <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row sm:justify-end gap-2 text-sm rounded-b-2xl">
-        <span>Total Stake: <b>₹{totals.stake}</b></span>
-        <span>Total Win: <b>₹{totals.win}</b></span>
-        <span className={totals.net >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>
-          Net: ₹{totals.net}
-        </span>
-      </div>
+      {/* 📱 Mobile card layout */}
+      {!loading && bets.length > 0 && (
+        <div className="sm:hidden flex flex-col gap-3">
+          {bets.map((r) => (
+            <div
+              key={r._id || r.id}
+              className="bg-white rounded-xl shadow p-3 border"
+            >
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>{new Date(r.createdAt).toLocaleString()}</span>
+                <span className="font-semibold text-gray-700">
+                  {r.match?.title || "—"}
+                </span>
+              </div>
+              <div className="mt-2 text-sm">
+                <p>
+                  <b>User:</b> {r.userId?.email || r.userId || "—"}
+                </p>
+                <p>
+                  <b>Team:</b> {r.team || r.selectedTeam || "—"}
+                </p>
+                <p>
+                  <b>Stake:</b> ₹{r.stake} &nbsp; | &nbsp;
+                  <b className={r.win > 0 ? "text-green-600" : "text-gray-600"}>
+                    Win: ₹{r.win}
+                  </b>
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 💰 Totals */}
+      {bets.length > 0 && (
+        <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row sm:justify-end gap-2 text-sm rounded-b-2xl">
+          <span>
+            Total Stake: <b>₹{totals.stake}</b>
+          </span>
+          <span>
+            Total Win: <b>₹{totals.win}</b>
+          </span>
+          <span
+            className={
+              totals.net >= 0
+                ? "text-green-700 font-semibold"
+                : "text-red-700 font-semibold"
+            }
+          >
+            Net: ₹{totals.net}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
