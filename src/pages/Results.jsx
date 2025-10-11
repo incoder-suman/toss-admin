@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Swords, MinusCircle } from "lucide-react";
+import { Check, Swords, MinusCircle, Edit2 } from "lucide-react";
 import api from "../api/axios";
 
 export default function Results() {
@@ -8,10 +8,11 @@ export default function Results() {
   const [published, setPublished] = useState(
     JSON.parse(localStorage.getItem("publishedResults") || "[]")
   );
-
   const token = localStorage.getItem("adminToken");
 
-  // ✅ Fetch LIVE/LOCKED matches
+  /* --------------------------------------------
+   🧩 Fetch matches (LIVE, LOCKED, COMPLETED)
+  -------------------------------------------- */
   const fetchMatches = async () => {
     try {
       const res = await api.get("/matches", {
@@ -19,11 +20,14 @@ export default function Results() {
       });
 
       const filtered = (res.data.matches || res.data).filter((m) =>
-        ["LIVE", "LOCKED"].includes(m.status)
+        ["LIVE", "LOCKED", "COMPLETED", "RESULT_DECLARED"].includes(
+          String(m.status).toUpperCase()
+        )
       );
+
       setMatches(filtered);
 
-      // Auto-select first
+      // Auto-select first match if none selected
       if (filtered.length > 0 && !selection.matchId) {
         setSelection({ matchId: filtered[0]._id, outcome: "" });
       }
@@ -36,24 +40,26 @@ export default function Results() {
     fetchMatches();
   }, [token]);
 
-  // ✅ Sync published results to localStorage
+  /* --------------------------------------------
+   💾 Sync localStorage (for persistence)
+  -------------------------------------------- */
   useEffect(() => {
     localStorage.setItem("publishedResults", JSON.stringify(published));
   }, [published]);
 
   const selectedMatch = useMemo(
     () => matches.find((m) => m._id === selection.matchId),
-    [matches, selection.matchId]
+    [matches, selection.matchId, matches]
   );
 
-  // ✅ Publish match result
+  /* --------------------------------------------
+   📢 Publish or Update Result
+  -------------------------------------------- */
   const publish = async () => {
     if (!selection.matchId || !selection.outcome)
       return alert("⚠️ Please select a match and outcome!");
 
     try {
-      console.log("Publishing result for:", selection.matchId, selection.outcome);
-
       const res = await api.put(
         `/matches/${selection.matchId}/result`,
         { result: selection.outcome },
@@ -61,31 +67,48 @@ export default function Results() {
       );
 
       const payload = {
-        id: crypto.randomUUID(),
+        id: selection.matchId,
         matchId: selection.matchId,
         title: selectedMatch?.title,
         outcome: selection.outcome,
         publishedAt: new Date().toISOString(),
       };
 
-      setMatches((prev) => prev.filter((m) => m._id !== selection.matchId));
-      setPublished((prev) => [payload, ...prev]);
+      // 🔁 If already published, replace the old one
+      setPublished((prev) => {
+        const others = prev.filter((p) => p.matchId !== selection.matchId);
+        return [payload, ...others];
+      });
+
+      // ✅ Keep match in list (for editing)
       setSelection({ matchId: "", outcome: "" });
 
       alert(`✅ ${res.data.message || "Result published successfully!"}`);
+      fetchMatches();
     } catch (err) {
       console.error("❌ Error publishing result:", err);
       alert(err.response?.data?.message || "Error publishing result");
     }
   };
 
+  /* --------------------------------------------
+   🧭 Edit Published Result
+  -------------------------------------------- */
+  const editResult = (matchId, outcome) => {
+    setSelection({ matchId, outcome });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /* --------------------------------------------
+   🖥️ UI
+  -------------------------------------------- */
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-bold">Results</h1>
 
-      {/* Selection Box */}
+      {/* Match & Outcome Selection */}
       <div className="bg-white rounded-2xl shadow p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Match select */}
+        {/* Match dropdown */}
         <div>
           <label className="text-sm text-gray-600">Select Match</label>
           <select
@@ -95,8 +118,9 @@ export default function Results() {
               setSelection({ matchId: e.target.value, outcome: "" })
             }
           >
+            <option value="">-- Select Match --</option>
             {matches.length === 0 ? (
-              <option>No LIVE/LOCKED matches</option>
+              <option>No matches found</option>
             ) : (
               matches.map((m) => (
                 <option key={m._id} value={m._id}>
@@ -107,7 +131,7 @@ export default function Results() {
           </select>
         </div>
 
-        {/* Outcome buttons */}
+        {/* Team outcome buttons */}
         <div>
           <label className="text-sm text-gray-600">Toss Winner</label>
           <div className="mt-2 flex gap-3 flex-wrap">
@@ -123,7 +147,7 @@ export default function Results() {
                       onClick={() =>
                         setSelection({ ...selection, outcome: full })
                       }
-                      className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
+                      className={`px-4 py-2 rounded-lg border flex items-center gap-2 text-sm ${
                         selection.outcome === full
                           ? "border-cyan-600 bg-cyan-50 text-cyan-700"
                           : "border-gray-200 hover:bg-gray-50"
@@ -134,10 +158,10 @@ export default function Results() {
                   );
                 })}
 
-            {/* ➕ Draw option */}
+            {/* Draw option */}
             <button
               onClick={() => setSelection({ ...selection, outcome: "DRAW" })}
-              className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg border flex items-center gap-2 text-sm ${
                 selection.outcome === "DRAW"
                   ? "border-red-600 bg-red-50 text-red-700"
                   : "border-gray-200 hover:bg-gray-50"
@@ -148,40 +172,57 @@ export default function Results() {
           </div>
         </div>
 
-        {/* Publish Button */}
+        {/* Publish button */}
         <div className="flex items-end">
           <button
-            className="bg-cyan-600 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-60"
             onClick={publish}
             disabled={!selection.matchId || !selection.outcome}
+            className="bg-cyan-600 w-full text-white px-4 py-2 rounded-lg inline-flex justify-center items-center gap-2 disabled:opacity-60"
           >
-            <Check size={18} /> Publish Result
+            <Check size={18} />{" "}
+            {published.find((p) => p.matchId === selection.matchId)
+              ? "Update Result"
+              : "Publish Result"}
           </button>
         </div>
       </div>
 
-      {/* Published Results */}
+      {/* Published Results List */}
       <div className="bg-white rounded-2xl shadow divide-y">
         {published.length === 0 ? (
           <div className="p-6 text-gray-500">No results published yet.</div>
         ) : (
           published.map((r) => (
-            <div key={r.id} className="p-4 flex justify-between items-center">
-              <div>
+            <div
+              key={r.matchId}
+              className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
+            >
+              <div className="flex-1">
                 <p className="font-medium">{r.title}</p>
                 <p className="text-xs text-gray-500">
-                  {new Date(r.publishedAt).toLocaleString()}
+                  Published: {new Date(r.publishedAt).toLocaleString()}
                 </p>
               </div>
-              <span
-                className={`px-3 py-1 rounded-full font-semibold ${
-                  r.outcome === "DRAW"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-cyan-100 text-cyan-700"
-                }`}
-              >
-                {r.outcome}
-              </span>
+
+              <div className="flex items-center gap-3">
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                    r.outcome === "DRAW"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-cyan-100 text-cyan-700"
+                  }`}
+                >
+                  {r.outcome}
+                </span>
+
+                {/* ✏️ Edit button */}
+                <button
+                  onClick={() => editResult(r.matchId, r.outcome)}
+                  className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Edit2 size={14} /> Edit
+                </button>
+              </div>
             </div>
           ))
         )}

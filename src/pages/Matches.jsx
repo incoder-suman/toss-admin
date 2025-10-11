@@ -1,7 +1,6 @@
-// src/pages/Matches.jsx
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import api from "../api/axios"; // ✅ central axios instance
+import api from "../api/axios";
 
 export default function Matches() {
   const [form, setForm] = useState({
@@ -9,14 +8,18 @@ export default function Matches() {
     secondTeam: "",
     date: "",
     time: "",
+    lastDate: "",
+    lastTime: "",
     minBet: 10,
     maxBet: 1000,
   });
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem("adminToken"); // ✅ same key as login
+  const token = localStorage.getItem("adminToken");
 
-  // ✅ Fetch all matches
+  /* -------------------------------------------------------
+   🧾 Fetch all matches
+  ------------------------------------------------------- */
   useEffect(() => {
     const fetchMatches = async () => {
       try {
@@ -31,21 +34,35 @@ export default function Matches() {
     fetchMatches();
   }, [token]);
 
-  // ✅ Create a new match
+  /* -------------------------------------------------------
+   ➕ Create a new match (with lastBetTime)
+  ------------------------------------------------------- */
   const handleCreate = async (e) => {
     e.preventDefault();
-    const { firstTeam, secondTeam, date, time } = form;
-    if (!firstTeam || !secondTeam || !date || !time) {
+    const { firstTeam, secondTeam, date, time, lastDate, lastTime } = form;
+
+    if (!firstTeam || !secondTeam || !date || !time || !lastDate || !lastTime) {
       alert("⚠️ Please fill all fields");
       return;
     }
 
     const startAt = new Date(`${date}T${time}:00`);
+    const lastBetTime = new Date(`${lastDate}T${lastTime}:00`);
+
+    if (lastBetTime >= startAt) {
+      alert("⚠️ Last bet time must be before the match start time.");
+      return;
+    }
+
     const body = {
       title: `${firstTeam} vs ${secondTeam}`,
       startAt,
+      lastBetTime,
       status: "UPCOMING",
-      odds: { HEADS: 1.98, TAILS: 1.98 },
+      odds: {
+        [firstTeam.slice(0, 3).toUpperCase()]: 1.98,
+        [secondTeam.slice(0, 3).toUpperCase()]: 1.98,
+      },
       minBet: form.minBet,
       maxBet: form.maxBet,
     };
@@ -61,6 +78,8 @@ export default function Matches() {
         secondTeam: "",
         date: "",
         time: "",
+        lastDate: "",
+        lastTime: "",
         minBet: 10,
         maxBet: 1000,
       });
@@ -73,7 +92,9 @@ export default function Matches() {
     }
   };
 
-  // ✅ Update match status
+  /* -------------------------------------------------------
+   ⚙️ Update match status (manual)
+  ------------------------------------------------------- */
   const updateStatus = async (id, status) => {
     try {
       const res = await api.put(
@@ -92,7 +113,9 @@ export default function Matches() {
     }
   };
 
-  // ✅ Status Badge Styling
+  /* -------------------------------------------------------
+   🎨 Status Badge Styles
+  ------------------------------------------------------- */
   const statusBadge = (s) =>
     s === "UPCOMING"
       ? "bg-gray-100 text-gray-700"
@@ -100,8 +123,15 @@ export default function Matches() {
       ? "bg-green-100 text-green-700"
       : s === "LOCKED"
       ? "bg-yellow-100 text-yellow-700"
-      : "bg-cyan-100 text-cyan-700";
+      : s === "RESULT_DECLARED"
+      ? "bg-blue-100 text-blue-700"
+      : s === "COMPLETED"
+      ? "bg-cyan-100 text-cyan-700"
+      : "bg-red-100 text-red-700";
 
+  /* -------------------------------------------------------
+   🖥️ Render UI
+  ------------------------------------------------------- */
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-bold">Matches</h1>
@@ -120,6 +150,7 @@ export default function Matches() {
             onChange={(e) => setForm({ ...form, firstTeam: e.target.value })}
           />
         </div>
+
         <div>
           <label className="text-sm text-gray-600">Second Team*</label>
           <input
@@ -129,8 +160,9 @@ export default function Matches() {
             onChange={(e) => setForm({ ...form, secondTeam: e.target.value })}
           />
         </div>
+
         <div>
-          <label className="text-sm text-gray-600">Date*</label>
+          <label className="text-sm text-gray-600">Match Date*</label>
           <input
             type="date"
             className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
@@ -138,13 +170,34 @@ export default function Matches() {
             onChange={(e) => setForm({ ...form, date: e.target.value })}
           />
         </div>
+
         <div>
-          <label className="text-sm text-gray-600">Time*</label>
+          <label className="text-sm text-gray-600">Match Time*</label>
           <input
             type="time"
             className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
             value={form.time}
             onChange={(e) => setForm({ ...form, time: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm text-gray-600">Last Bet Date*</label>
+          <input
+            type="date"
+            className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
+            value={form.lastDate}
+            onChange={(e) => setForm({ ...form, lastDate: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm text-gray-600">Last Bet Time*</label>
+          <input
+            type="time"
+            className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
+            value={form.lastTime}
+            onChange={(e) => setForm({ ...form, lastTime: e.target.value })}
           />
         </div>
 
@@ -154,18 +207,20 @@ export default function Matches() {
             disabled={loading}
             className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg w-full sm:w-auto"
           >
-            <Plus size={18} /> {loading ? "Creating..." : "Create Toss"}
+            <Plus size={18} />
+            {loading ? "Creating..." : "Create Match"}
           </button>
         </div>
       </form>
 
       {/* ✅ Matches Table */}
       <div className="bg-white rounded-2xl shadow overflow-x-auto">
-        <table className="min-w-[800px] w-full text-sm">
+        <table className="min-w-[900px] w-full text-sm">
           <thead className="bg-gray-50 text-gray-600">
             <tr>
               <th className="px-4 py-3 text-left">Match</th>
               <th className="px-4 py-3 text-left">Start Time</th>
+              <th className="px-4 py-3 text-left">Last Bet Time</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left">Actions</th>
             </tr>
@@ -173,7 +228,7 @@ export default function Matches() {
           <tbody>
             {matches.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={4}>
+                <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                   No matches yet.
                 </td>
               </tr>
@@ -183,6 +238,11 @@ export default function Matches() {
                   <td className="px-4 py-3 font-medium">{m.title}</td>
                   <td className="px-4 py-3">
                     {new Date(m.startAt).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    {m.lastBetTime
+                      ? new Date(m.lastBetTime).toLocaleString()
+                      : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span
