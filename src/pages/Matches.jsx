@@ -6,8 +6,6 @@ export default function Matches() {
   const [form, setForm] = useState({
     firstTeam: "",
     secondTeam: "",
-    // date: "",
-    // time: "",
     lastDate: "",
     lastTime: "",
     minBet: 50,
@@ -35,28 +33,22 @@ export default function Matches() {
   }, [token]);
 
   /* -------------------------------------------------------
-   ➕ Create a new match (with lastBetTime)
+   ➕ Create a new match (without match date/time)
   ------------------------------------------------------- */
   const handleCreate = async (e) => {
     e.preventDefault();
-    const { firstTeam, secondTeam, date, time, lastDate, lastTime } = form;
+    const { firstTeam, secondTeam, lastDate, lastTime } = form;
 
-    if (!firstTeam || !secondTeam || !date || !time || !lastDate || !lastTime) {
+    if (!firstTeam || !secondTeam || !lastDate || !lastTime) {
       alert("⚠️ Please fill all fields");
       return;
     }
 
-    const startAt = new Date(`${date}T${time}:00`);
     const lastBetTime = new Date(`${lastDate}T${lastTime}:00`);
-
-    if (lastBetTime >= startAt) {
-      alert("⚠️ Last bet time must be before the match start time.");
-      return;
-    }
 
     const body = {
       title: `${firstTeam} vs ${secondTeam}`,
-      startAt,
+      startAt: new Date(), // current time as placeholder
       lastBetTime,
       status: "UPCOMING",
       odds: {
@@ -76,11 +68,9 @@ export default function Matches() {
       setForm({
         firstTeam: "",
         secondTeam: "",
-        // date: "",
-        // time: "",
         lastDate: "",
         lastTime: "",
-        minBet: 10,
+        minBet: 50,
         maxBet: 10000,
       });
       alert("✅ Match created successfully!");
@@ -161,26 +151,6 @@ export default function Matches() {
           />
         </div>
 
-        {/* <div>
-          <label className="text-sm text-gray-600">Match Date*</label>
-          <input
-            type="date"
-            className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
-        </div> */}
-
-        {/* <div>
-          <label className="text-sm text-gray-600">Match Time*</label>
-          <input
-            type="time"
-            className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-cyan-500"
-            value={form.time}
-            onChange={(e) => setForm({ ...form, time: e.target.value })}
-          />
-        </div> */}
-
         <div>
           <label className="text-sm text-gray-600">Last Bet Date*</label>
           <input
@@ -219,7 +189,6 @@ export default function Matches() {
           <thead className="bg-gray-50 text-gray-600">
             <tr>
               <th className="px-4 py-3 text-left">Match</th>
-              <th className="px-4 py-3 text-left">Start Time</th>
               <th className="px-4 py-3 text-left">Last Bet Time</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left">Actions</th>
@@ -228,7 +197,7 @@ export default function Matches() {
           <tbody>
             {matches.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
                   No matches yet.
                 </td>
               </tr>
@@ -236,9 +205,6 @@ export default function Matches() {
               matches.map((m) => (
                 <tr key={m._id} className="border-t">
                   <td className="px-4 py-3 font-medium">{m.title}</td>
-                  <td className="px-4 py-3">
-                    {new Date(m.startAt).toLocaleString()}
-                  </td>
                   <td className="px-4 py-3">
                     {m.lastBetTime
                       ? new Date(m.lastBetTime).toLocaleString()
