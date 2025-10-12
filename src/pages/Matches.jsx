@@ -6,12 +6,12 @@ export default function Matches() {
   const [form, setForm] = useState({
     firstTeam: "",
     secondTeam: "",
-    date: "",
-    time: "",
+    // date: "",
+    // time: "",
     lastDate: "",
     lastTime: "",
-    minBet: 10,
-    maxBet: 1000,
+    minBet: 50,
+    maxBet: 10000,
   });
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -76,12 +76,12 @@ export default function Matches() {
       setForm({
         firstTeam: "",
         secondTeam: "",
-        date: "",
-        time: "",
+        // date: "",
+        // time: "",
         lastDate: "",
         lastTime: "",
         minBet: 10,
-        maxBet: 1000,
+        maxBet: 10000,
       });
       alert("✅ Match created successfully!");
     } catch (err) {
@@ -161,7 +161,7 @@ export default function Matches() {
           />
         </div>
 
-        <div>
+        {/* <div>
           <label className="text-sm text-gray-600">Match Date*</label>
           <input
             type="date"
@@ -169,9 +169,9 @@ export default function Matches() {
             value={form.date}
             onChange={(e) => setForm({ ...form, date: e.target.value })}
           />
-        </div>
+        </div> */}
 
-        <div>
+        {/* <div>
           <label className="text-sm text-gray-600">Match Time*</label>
           <input
             type="time"
@@ -179,7 +179,7 @@ export default function Matches() {
             value={form.time}
             onChange={(e) => setForm({ ...form, time: e.target.value })}
           />
-        </div>
+        </div> */}
 
         <div>
           <label className="text-sm text-gray-600">Last Bet Date*</label>
