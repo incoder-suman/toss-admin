@@ -39,7 +39,7 @@ export default function Matches() {
     e.preventDefault();
     const { firstTeam, secondTeam, lastDate, lastTime } = form;
 
-    if (!firstTeam || !secondTeam || !lastDate || !lastTime) {
+    if (!lastDate || !lastTime) {
       alert("⚠️ Please fill all fields");
       return;
     }
