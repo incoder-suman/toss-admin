@@ -35,7 +35,7 @@ export default function Users() {
     fetchUsers();
   }, [token]);
 
-  // ✅ Create new user (email optional, password fixed)
+  // ✅ Create new user
   const handleCreateUser = async () => {
     try {
       const body = {
@@ -111,13 +111,19 @@ export default function Users() {
     }
   };
 
-  // ✅ Fetch real transaction history from backend
+  // ✅ Fetch only ADMIN-CREDIT & WITHDRAW history
   const fetchHistory = async (user) => {
     try {
       const res = await api.get(`/users/transactions/${user._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setHistory(res.data.transactions || []);
+
+      // 👇 Filter only Admin actions (Deposit/Withdraw)
+      const filtered = (res.data.transactions || []).filter(
+        (t) => t.type === "ADMIN_CREDIT" || t.type === "WITHDRAW"
+      );
+
+      setHistory(filtered);
     } catch (err) {
       console.error("❌ Error fetching history:", err);
       alert("Failed to fetch transaction history");
@@ -290,26 +296,30 @@ export default function Users() {
             <h2 className="text-lg font-semibold mb-4">
               Transaction History – {selectedUser.name}
             </h2>
-            <table className="min-w-[420px] w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left">Type</th>
-                  <th className="px-3 py-2 text-right">Amount</th>
-                  <th className="px-3 py-2">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h._id} className="border-t">
-                    <td className="px-3 py-2 capitalize">{h.type}</td>
-                    <td className="px-3 py-2 text-right">₹{h.amount}</td>
-                    <td className="px-3 py-2">
-                      {new Date(h.createdAt).toLocaleString()}
-                    </td>
+            {history.length === 0 ? (
+              <p className="text-gray-500 text-center py-6">No admin transactions found.</p>
+            ) : (
+              <table className="min-w-[420px] w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Type</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h._id} className="border-t">
+                      <td className="px-3 py-2 capitalize">{h.type}</td>
+                      <td className="px-3 py-2 text-right">₹{h.amount}</td>
+                      <td className="px-3 py-2">
+                        {new Date(h.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
             <div className="flex justify-end mt-4">
               <button onClick={() => setShowHistory(false)} className="px-4 py-2 border rounded">
                 Close
