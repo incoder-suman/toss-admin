@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Search } from "lucide-react";
-import api from "../api/axios"; // central axios instance
+import api from "../api/axios";
 
 export default function BetsReport() {
   const [userId, setUserId] = useState("");
@@ -8,17 +8,16 @@ export default function BetsReport() {
   const [loading, setLoading] = useState(false);
   const token = localStorage.getItem("adminToken");
 
-  // 🔁 Fetch bets for entered User ID
+  // 🧠 Fetch bets (all users OR specific user)
   useEffect(() => {
-    if (!userId.trim()) {
-      setBets([]);
-      return;
-    }
-
-    const fetchUserBets = async () => {
+    const fetchBets = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/bets?userId=${userId}`, {
+        const endpoint = userId.trim()
+          ? `/bets?userId=${userId.trim()}`
+          : `/bets`; // ✅ if no userId, fetch all bets
+
+        const res = await api.get(endpoint, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setBets(res.data.bets || res.data || []);
@@ -30,8 +29,8 @@ export default function BetsReport() {
       }
     };
 
-    // debounce (wait 600 ms after typing)
-    const timer = setTimeout(fetchUserBets, 600);
+    // ⏳ debounce search (600ms)
+    const timer = setTimeout(fetchBets, 600);
     return () => clearTimeout(timer);
   }, [userId, token]);
 
@@ -63,9 +62,9 @@ export default function BetsReport() {
       </div>
 
       {/* 🕓 Loading */}
-      {loading && <p className="text-gray-500 p-4">Loading user bets...</p>}
+      {loading && <p className="text-gray-500 p-4">Loading bets...</p>}
 
-      {/* 🧾 Bets table (desktop) */}
+      {/* 🧾 Bets table */}
       {!loading && (
         <div className="bg-white rounded-2xl shadow overflow-x-auto hidden sm:block">
           <table className="min-w-[900px] w-full text-sm">
@@ -84,7 +83,7 @@ export default function BetsReport() {
               {bets.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
-                    No bets found for this user.
+                    No bets found.
                   </td>
                 </tr>
               ) : (
@@ -94,8 +93,8 @@ export default function BetsReport() {
                     <td className="px-4 py-3 font-medium">
                       {r.userId?.email || r.userId || "—"}
                     </td>
-                    <td className="px-4 py-3">{r.match?.title || r.match || "—"}</td>
-                    <td className="px-4 py-3">{r.team || r.selectedTeam || "—"}</td>
+                    <td className="px-4 py-3">{r.match?.title || "—"}</td>
+                    <td className="px-4 py-3">{r.team || "—"}</td>
                     <td className="px-4 py-3">₹{r.stake}</td>
                     <td
                       className={`px-4 py-3 ${
@@ -115,14 +114,11 @@ export default function BetsReport() {
         </div>
       )}
 
-      {/* 📱 Mobile card layout */}
+      {/* 📱 Mobile layout */}
       {!loading && bets.length > 0 && (
         <div className="sm:hidden flex flex-col gap-3">
           {bets.map((r) => (
-            <div
-              key={r._id || r.id}
-              className="bg-white rounded-xl shadow p-3 border"
-            >
+            <div key={r._id} className="bg-white rounded-xl shadow p-3 border">
               <div className="flex justify-between text-sm text-gray-500">
                 <span>{new Date(r.createdAt).toLocaleString()}</span>
                 <span className="font-semibold text-gray-700">
@@ -131,10 +127,10 @@ export default function BetsReport() {
               </div>
               <div className="mt-2 text-sm">
                 <p>
-                  <b>User:</b> {r.userId?.email || r.userId || "—"}
+                  <b>User:</b> {r.userId?.email || "—"}
                 </p>
                 <p>
-                  <b>Team:</b> {r.team || r.selectedTeam || "—"}
+                  <b>Team:</b> {r.team || "—"}
                 </p>
                 <p>
                   <b>Stake:</b> ₹{r.stake} &nbsp; | &nbsp;
