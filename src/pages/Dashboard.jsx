@@ -4,11 +4,12 @@ import api from "../api/axios";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
-    users: 0,
-    matches: 0,
+    totalUsers: 0,
+    totalMatches: 0,
     activeBets: 0,
-    revenue: 0,
+    totalRevenue: 0,
   });
+
   const token = localStorage.getItem("adminToken");
 
   // ✅ Fetch live dashboard stats
@@ -17,7 +18,9 @@ export default function Dashboard() {
       const res = await api.get("/admin/stats", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setStats(res.data);
+
+      // ✅ Backend returns { success, stats: {...} }
+      setStats(res.data?.stats || {});
     } catch (err) {
       console.error("❌ Error fetching dashboard stats:", err);
     }
@@ -39,28 +42,30 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl shadow p-6 flex flex-col items-start transition-all hover:scale-[1.02]">
           <Users className="text-cyan-600 mb-2" size={28} />
           <p className="text-gray-600">Total Users</p>
-          <h2 className="text-2xl font-bold">{stats.users}</h2>
+          <h2 className="text-2xl font-bold">{stats?.totalUsers || 0}</h2>
         </div>
 
         {/* 🏆 Matches */}
         <div className="bg-white rounded-2xl shadow p-6 flex flex-col items-start transition-all hover:scale-[1.02]">
           <Trophy className="text-cyan-600 mb-2" size={28} />
           <p className="text-gray-600">Matches</p>
-          <h2 className="text-2xl font-bold">{stats.matches}</h2>
+          <h2 className="text-2xl font-bold">{stats?.totalMatches || 0}</h2>
         </div>
 
         {/* 🎯 Active Bets */}
         <div className="bg-white rounded-2xl shadow p-6 flex flex-col items-start transition-all hover:scale-[1.02]">
           <Coins className="text-cyan-600 mb-2" size={28} />
           <p className="text-gray-600">Active Bets</p>
-          <h2 className="text-2xl font-bold">{stats.activeBets}</h2>
+          <h2 className="text-2xl font-bold">{stats?.activeBets || 0}</h2>
         </div>
 
         {/* 💰 Revenue */}
         <div className="bg-white rounded-2xl shadow p-6 flex flex-col items-start transition-all hover:scale-[1.02]">
           <Wallet className="text-cyan-600 mb-2" size={28} />
           <p className="text-gray-600">Revenue</p>
-          <h2 className="text-2xl font-bold">₹{stats.revenue.toLocaleString()}</h2>
+          <h2 className="text-2xl font-bold">
+            ₹{stats?.totalRevenue?.toLocaleString?.() || "0"}
+          </h2>
         </div>
       </div>
     </div>
