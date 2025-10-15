@@ -16,7 +16,8 @@ export default function BetsReport() {
 
         // ✅ Use admin list endpoint, keep userId filter
         const qs = userId.trim() ? `?userId=${encodeURIComponent(userId.trim())}` : "";
-        const endpoint = `/bets/admin/list${qs}`;
+        const endpoint = `/bets${qs}`;
+
 
         const res = await api.get(endpoint, {
           headers: { Authorization: `Bearer ${token}` },
