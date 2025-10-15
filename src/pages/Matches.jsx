@@ -9,7 +9,7 @@ export default function Matches() {
     lastDate: "",
     lastTime: "",
     minBet: 50,
-    maxBet: 10000,
+    maxBet: 1000000,
   });
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
