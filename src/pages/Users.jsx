@@ -21,7 +21,7 @@ export default function Users() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [history, setHistory] = useState([]);
 
-  // 🆕 action flags (UX)
+  // action flags (UX)
   const [creating, setCreating] = useState(false);
   const [adding, setAdding] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -49,7 +49,7 @@ export default function Users() {
   }, [token]);
 
   /* --------------------------------------------
-   * History fetcher (ADMIN_CREDIT & WITHDRAW only)
+   * History fetcher (Admin deposit/withdraw only)
    * ------------------------------------------ */
   const fetchHistory = async (user) => {
     try {
@@ -58,9 +58,17 @@ export default function Users() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const filtered = (res.data.transactions || []).filter(
-        (t) => t.type === "ADMIN_CREDIT" || t.type === "WITHDRAW"
-      );
+      // 🟢 broadened filter to always show withdraw variants
+      const ADMIN_TYPES = new Set([
+        "ADMIN_CREDIT",
+        "WITHDRAW",
+        "ADMIN_DEBIT",
+        "ADMIN_WITHDRAW",
+        "DEBIT",
+      ]);
+
+      const all = res.data.transactions || [];
+      const filtered = all.filter((t) => ADMIN_TYPES.has(String(t.type)));
       setHistory(filtered);
     } catch (err) {
       console.error("❌ Error fetching history:", err);
@@ -68,7 +76,7 @@ export default function Users() {
     }
   };
 
-  // 🆕 Modal open hote hi latest history laao (refresh-safe)
+  // Modal khulte hi latest history (refresh-safe)
   useEffect(() => {
     if (showHistory && selectedUser?._id) {
       fetchHistory(selectedUser);
@@ -133,12 +141,9 @@ export default function Users() {
         )
       );
 
-      // 🆕 history update: optimistic + server sync
+      // history: optimistic + hard sync (if modal open)
       if (showHistory && selectedUser?._id) {
-        if (res.data?.transaction) {
-          setHistory((prev) => [res.data.transaction, ...prev]);
-        }
-        // hard sync from server (safe)
+        if (res.data?.transaction) setHistory((prev) => [res.data.transaction, ...prev]);
         fetchHistory(selectedUser);
       }
 
@@ -179,11 +184,9 @@ export default function Users() {
         )
       );
 
-      // 🆕 history update: optimistic + server sync
+      // history: optimistic + hard sync (if modal open)
       if (showHistory && selectedUser?._id) {
-        if (res.data?.transaction) {
-          setHistory((prev) => [res.data.transaction, ...prev]);
-        }
+        if (res.data?.transaction) setHistory((prev) => [res.data.transaction, ...prev]);
         fetchHistory(selectedUser);
       }
 
@@ -411,8 +414,15 @@ export default function Users() {
                 <tbody>
                   {history.map((h) => {
                     const amt = Number(h.amount || 0);
-                    const isCredit = h.type === "ADMIN_CREDIT";
-                    const isDebit = h.type === "WITHDRAW";
+                    const isCredit = String(h.type) === "ADMIN_CREDIT";
+                    const isDebit =
+                      String(h.type) === "WITHDRAW" ||
+                      String(h.type) === "ADMIN_DEBIT" ||
+                      String(h.type) === "ADMIN_WITHDRAW" ||
+                      String(h.type) === "DEBIT";
+
+                    const displayAmt = isDebit ? -Math.abs(amt) : Math.abs(amt);
+
                     return (
                       <tr key={h._id} className="border-t">
                         <td className="px-3 py-2 capitalize">{h.type}</td>
@@ -421,12 +431,10 @@ export default function Users() {
                             isCredit ? "text-green-600" : isDebit ? "text-red-600" : ""
                           }`}
                         >
-                          ₹{amt.toFixed(2)}
+                          ₹{displayAmt.toFixed(2)}
                         </td>
                         <td className="px-3 py-2">
-                          {h.createdAt
-                            ? new Date(h.createdAt).toLocaleString()
-                            : "—"}
+                          {h.createdAt ? new Date(h.createdAt).toLocaleString() : "—"}
                         </td>
                       </tr>
                     );
