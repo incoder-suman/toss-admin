@@ -10,6 +10,8 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [search, setSearch] = useState(""); // ✅ SEARCH STATE
+
   const [createForm, setCreateForm] = useState({
     name: "",
     email: "",
@@ -21,7 +23,6 @@ export default function Users() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [history, setHistory] = useState([]);
 
-  // action flags (UX)
   const [creating, setCreating] = useState(false);
   const [adding, setAdding] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -29,7 +30,7 @@ export default function Users() {
   const token = localStorage.getItem("adminToken");
 
   /* --------------------------------------------
-   * Fetch Users (initial load)
+   * Fetch Users
    * ------------------------------------------ */
   useEffect(() => {
     const fetchUsers = async () => {
@@ -49,7 +50,18 @@ export default function Users() {
   }, [token]);
 
   /* --------------------------------------------
-   * History fetcher (Admin deposit/withdraw only)
+   * SEARCH FILTER (name + email)
+   * ------------------------------------------ */
+  const filteredUsers = users.filter((u) => {
+    const q = search.toLowerCase();
+    return (
+      u.name?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q)
+    );
+  });
+
+  /* --------------------------------------------
+   * History fetcher
    * ------------------------------------------ */
   const fetchHistory = async (user) => {
     try {
@@ -58,7 +70,6 @@ export default function Users() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // 🟢 broadened filter to always show withdraw variants
       const ADMIN_TYPES = new Set([
         "ADMIN_CREDIT",
         "WITHDRAW",
@@ -68,46 +79,42 @@ export default function Users() {
       ]);
 
       const all = res.data.transactions || [];
-      const filtered = all.filter((t) => ADMIN_TYPES.has(String(t.type)));
-      setHistory(filtered);
-    } catch (err) {
-      console.error("❌ Error fetching history:", err);
+      setHistory(all.filter((t) => ADMIN_TYPES.has(String(t.type))));
+    } catch {
       alert("Failed to fetch transaction history");
     }
   };
 
-  // Modal khulte hi latest history (refresh-safe)
   useEffect(() => {
     if (showHistory && selectedUser?._id) {
       fetchHistory(selectedUser);
     }
-  }, [showHistory, selectedUser]); // eslint-disable-line
+  }, [showHistory, selectedUser]);
 
   /* --------------------------------------------
    * Create user
    * ------------------------------------------ */
   const handleCreateUser = async () => {
+    if (!createForm.name.trim()) return alert("⚠️ Name is required!");
+
     try {
-      const body = {
-        name: createForm.name.trim(),
-        email:
-          createForm.email?.trim() ||
-          `${createForm.name.trim().toLowerCase()}@dummy.com`,
-        password: "Ftb@321",
-      };
-      if (!body.name) return alert("⚠️ Name is required!");
-
       setCreating(true);
-      const res = await api.post("/users", body, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.post(
+        "/users",
+        {
+          name: createForm.name.trim(),
+          email:
+            createForm.email.trim() ||
+            `${createForm.name.trim().toLowerCase()}@dummy.com`,
+          password: "Ftb@321",
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      alert("✅ User created successfully!");
       setUsers((prev) => [res.data.user, ...prev]);
       setCreateForm({ name: "", email: "", password: "Ftb@321" });
       setShowCreate(false);
     } catch (err) {
-      console.error(err);
       alert(err.response?.data?.message || "Error creating user");
     } finally {
       setCreating(false);
@@ -115,12 +122,11 @@ export default function Users() {
   };
 
   /* --------------------------------------------
-   * Add Tokens (Admin Credit)
+   * Add Tokens
    * ------------------------------------------ */
   const handleAddTokens = async () => {
-    if (!selectedUser?._id) return alert("⚠️ No user selected");
     const amt = Number(tokenAmount);
-    if (!amt || isNaN(amt) || amt <= 0) return alert("⚠️ Enter valid amount");
+    if (!amt || amt <= 0) return alert("⚠️ Enter valid amount");
 
     try {
       setAdding(true);
@@ -130,9 +136,6 @@ export default function Users() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert(`✅ ${amt} tokens added to ${selectedUser.name}`);
-
-      // update list balance
       setUsers((prev) =>
         prev.map((u) =>
           u._id === selectedUser._id
@@ -141,29 +144,19 @@ export default function Users() {
         )
       );
 
-      // history: optimistic + hard sync (if modal open)
-      if (showHistory && selectedUser?._id) {
-        if (res.data?.transaction) setHistory((prev) => [res.data.transaction, ...prev]);
-        fetchHistory(selectedUser);
-      }
-
       setShowTokens(false);
       setTokenAmount("");
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Error adding tokens");
     } finally {
       setAdding(false);
     }
   };
 
   /* --------------------------------------------
-   * Withdraw Tokens (Admin Debit)
+   * Withdraw Tokens
    * ------------------------------------------ */
   const handleWithdrawTokens = async () => {
-    if (!selectedUser?._id) return alert("⚠️ No user selected");
     const amt = Number(withdrawAmount);
-    if (!amt || isNaN(amt) || amt <= 0) return alert("⚠️ Enter valid amount");
+    if (!amt || amt <= 0) return alert("⚠️ Enter valid amount");
 
     try {
       setWithdrawing(true);
@@ -173,9 +166,6 @@ export default function Users() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert(`💸 ${amt} tokens withdrawn from ${selectedUser.name}`);
-
-      // update list balance
       setUsers((prev) =>
         prev.map((u) =>
           u._id === selectedUser._id
@@ -184,17 +174,8 @@ export default function Users() {
         )
       );
 
-      // history: optimistic + hard sync (if modal open)
-      if (showHistory && selectedUser?._id) {
-        if (res.data?.transaction) setHistory((prev) => [res.data.transaction, ...prev]);
-        fetchHistory(selectedUser);
-      }
-
       setShowWithdraw(false);
       setWithdrawAmount("");
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Error withdrawing tokens");
     } finally {
       setWithdrawing(false);
     }
@@ -205,78 +186,98 @@ export default function Users() {
   return (
     <div className="p-4 sm:p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold">Users</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md w-full sm:w-auto"
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
         >
           Create User
         </button>
       </div>
 
+      {/* 🔍 SEARCH INPUT */}
+      <input
+        type="text"
+        placeholder="Search by name or email..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full sm:w-80 border px-3 py-2 rounded mb-4"
+      />
+
       {/* Table */}
       <div className="bg-white shadow rounded overflow-x-auto">
         <table className="min-w-[720px] w-full text-sm">
-          <thead className="bg-gray-50 text-gray-700">
+          <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-2 text-left">Name</th>
               <th className="px-4 py-2 text-left">Email</th>
               <th className="px-4 py-2 text-right">Balance</th>
-              <th className="px-4 py-2 text-left">Created</th>
+              <th className="px-4 py-2">Created</th>
               <th className="px-4 py-2 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u._id} className="border-t">
-                <td className="px-4 py-2 font-medium">{u.name}</td>
-                <td className="px-4 py-2">{u.email}</td>
-                <td className="px-4 py-2 text-right">₹{u.walletBalance ?? 0}</td>
-                <td className="px-4 py-2">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  <div className="flex justify-center gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setShowTokens(true);
-                      }}
-                      className="px-3 py-1 border rounded text-xs hover:bg-gray-50"
-                      disabled={adding || withdrawing}
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setShowWithdraw(true);
-                      }}
-                      className="px-3 py-1 border rounded text-xs hover:bg-gray-50"
-                      disabled={adding || withdrawing}
-                    >
-                      Withdraw
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setShowHistory(true);
-                      }}
-                      className="px-3 py-1 border rounded text-xs hover:bg-gray-50"
-                      disabled={adding || withdrawing}
-                    >
-                      History
-                    </button>
-                  </div>
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="text-center py-6 text-gray-500">
+                  No users found
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredUsers.map((u) => (
+                <tr key={u._id} className="border-t">
+                  <td className="px-4 py-2 font-medium">{u.name}</td>
+                  <td className="px-4 py-2">{u.email}</td>
+                  <td className="px-4 py-2 text-right">
+                    ₹{u.walletBalance ?? 0}
+                  </td>
+                  <td className="px-4 py-2">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+
+                  {/* ✅ RESPONSIVE ACTION BUTTONS */}
+                  <td className="px-4 py-2">
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <button
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setShowTokens(true);
+                        }}
+                        className="w-full sm:w-auto px-3 py-2 border rounded text-xs"
+                      >
+                        Add
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setShowWithdraw(true);
+                        }}
+                        className="w-full sm:w-auto px-3 py-2 border rounded text-xs"
+                      >
+                        Withdraw
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setShowHistory(true);
+                        }}
+                        className="w-full sm:w-auto px-3 py-2 border rounded text-xs"
+                      >
+                        History
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* ✅ Create User Modal */}
+     {/* ✅ Create User Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white p-5 rounded-lg w-full max-w-md">
@@ -453,7 +454,7 @@ export default function Users() {
             </div>
           </div>
         </div>
-      )}
+      )}      
     </div>
   );
 }
